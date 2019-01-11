@@ -52,9 +52,9 @@ class Laplacian2D // pas fini de modifier
 
     void InitializeCL(std::string gamma_0, std::string gamma_1);
 
-    std::vector<std::vector<double>> InitializeMatrix(int i1,int iN,const int stencil);
+    std::vector<std::vector<double>> InitializeMatrix(int i1,int iN,const int stencil, int size_loc);
 
-    std::vector<double> InitializeCI(double CI, int i1, int iN, int stencil);
+    std::vector<double> InitializeCI(double CI, int size_loc);
 
     std::vector<double> IterativeSolver(std::vector<std::vector<double>> LapMat, std::vector<double> solloc,int i1, int iN, const int stencil);   // Résout le système _LapMat * _sol = _f avec un solveur itératif.
 

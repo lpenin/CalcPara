@@ -24,8 +24,8 @@ int main(int argc, char * argv[])
 
   std::vector<double> tab_charge(Np);
 
-  int Nx = 10;
-  int Ny = 10;
+  int Nx = 4;
+  int Ny = 4;
   int i1,iN;
 
   double xmin = 0.;
@@ -47,12 +47,12 @@ int main(int argc, char * argv[])
   // else   {const int stencil=1;}
 
   double sol_s_deb, sol_s_fin;
-  string gamma_0 = "trigonometrique";
-  string gamma_1 = "trigonometrique";
+  string gamma_0 = "non";
+  string gamma_1 = "non";
 
   int nb_iterations = int(ceil(tfinal/deltaT));
 
-  string Source = "trigonometrique"; //Peut prendre comMe valeur "non", "polynomial", "trigonoMetrique" ou "instationnaire".
+  string Source = "non"; //Peut prendre comMe valeur "non", "polynomial", "trigonoMetrique" ou "instationnaire".
   //Choisir trigonométrique Met à jour les conditions limites automatiqueMent.
 
   double CI = 0.;
@@ -62,10 +62,11 @@ int main(int argc, char * argv[])
 
   charge(Nx*Ny,Np,Me,i1,iN);
 
-  std::cout << "-----------i1 " << i1 << " iN " << iN << " taille "<< iN-i1 << std::endl;
+  int size_loc= iN-i1+1+2*stencil;
 
-  iN=iN+1;
-  std::vector<double> solloc(iN-i1+2*stencil);
+  std::cout << "-----------i1 " << i1 << " iN " << iN << " taille "<< size_loc << std::endl;
+
+  std::vector<double> solloc(size_loc);
 
 
   Laplacian2D Lap;
@@ -79,35 +80,26 @@ int main(int argc, char * argv[])
     solfinale[ini]=0.;
   }
 
-  solloc=Lap.InitializeCI(CI, i1, iN, stencil);
+  solloc=Lap.InitializeCI(CI, size_loc);
 
   //Sauvegarde des CIs
-  if ((Me != 0) && (Me!=Np-1))
-  {
-
-    for (int j=i1+stencil; j<=iN+1-stencil;j++)
+  for (int j=i1; j<iN+1; j++)
     {
-      solfinale_loc[j]=solloc[j-i1+stencil];
+      if (Me == 0)
+      {
+        solfinale_loc[j]=2; //solloc[j];
+      }
+      if ((Me != 0) && (Me!=Np-1))
+      {
+        solfinale_loc[j]=5; //solloc[j-i1+stencil];
+      }
+      if (Me == Np-1)
+      {
+        solfinale_loc[j]=10; //solloc[j-i1+2*stencil];
+      }
     }
-  }
 
-  if (Me==0)
-  {
-    for (int j=i1; j<iN+1-stencil;j++)
-    {
-      solfinale_loc[j]=solloc[j-i1];
-    }
-  }
-  if (Me == Np-1)
-  {
-    for (int j=i1+2*stencil; j<iN+1;j++)
-    {
-      solfinale_loc[j]=solloc[j-i1+2*stencil];
-    }
-  }
-
-
-  for (int ini=0; ini <Nx*Ny+1; ini++)
+  for (int ini=0; ini <Nx*Ny; ini++)
   {
     MPI_Reduce(&solfinale_loc[ini], &solfinale[ini], 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   }
@@ -115,47 +107,75 @@ int main(int argc, char * argv[])
 
   if ((Me==0))
   {
+    // for (int i=0; i<Nx*Ny; i++)
+    // {
+    //   cout<< "    "<<solfinale[i] << endl;
+    // }
     Lap.SaveSol("TER/sol_it_"+to_string(0)+".vtk", solfinale); // -> partage solloc avec le processeur 0 pour qu'il puisse écrire la solution dans un fichier .vtk
   }
   //Fin sauvegarde
 
-
-
   // Initialise les CLs
   Lap.InitializeCL(gamma_0, gamma_1);
-  // Initialise la petite Matrice par proc
-  vector<vector<double>> LapMat;
 
-  LapMat.resize(iN-i1+2*stencil);
-  for (int i=0; i<(iN-i1+2*stencil); i++)
+  // Initialise la petite Matrice par proc
+  vector<vector<double>> LapMat(size_loc);
+
+  for (int i=0; i<(size_loc); i++)
   {
     LapMat[i].resize(Nx*Ny);
   }
 
-  LapMat=Lap.InitializeMatrix(i1, iN, stencil);
+  LapMat=Lap.InitializeMatrix(i1, iN, stencil, size_loc);
 
   auto start = chrono::high_resolution_clock::now();
 
   // Nouvelle boucle sur le nombre d'itétration
-  for (int i=0; i<2; i+= stencil)
+  for (int i=0; i<2; i+= stencil) //TODO
   // for (int i=0; i<nb_iterations; i+= stencil)
   {
-if (Me==0){
-      for (int test=0; test<iN-i1+2; test++)
-      {
-        //cout <<"Me= " << Me <<" pour i= "<< i1+test << " solloc = "<< solloc[test]<< endl;
-      }
-    }
+    // if (Me==0)
+    // {
+    //   for (int test=0; test<iN-i1+2; test++)
+    //   {
+    //     cout <<"Me= " << Me <<" pour i= "<< i1+test << " solloc = "<< solloc[test]<< endl;
+    //   }
+    // }
 
     solloc=Lap.IterativeSolver(LapMat, solloc, i1, iN, stencil);
     // cout << " ICI encore me = " << Me << " i1, iN "<< i1 << " et "<<iN << " solloc size= "<< solloc.size()<<endl;
-
-if (Me==0){
-    for (int test=0; test<iN-i1+2; test++)
+    if ((Me==0))
     {
-      //cout <<"Me= " << Me <<" pour i= "<< i1+test << " solloc = "<< solloc[test]<< endl;
+      for (int i=0; i<size_loc; i++)
+      {
+        cout<<"  "<< Me <<"   "<<solloc[i] << endl;
+      }
+    }
+
+    if ((Me==1))
+    {
+      for (int i=0; i<size_loc; i++)
+      {
+        cout<<"  "<< Me <<"   "<<solloc[i] << endl;
     }
   }
+
+    if ((Me==2))
+    {
+      for (int i=0; i<size_loc; i++)
+      {
+        cout<<"  "<< Me <<"   "<<solloc[i] << endl;
+    }
+  }
+
+    if ((Me==3))
+    {
+      for (int i=0; i<size_loc; i++)
+      {
+        cout<<"  "<< Me <<"   "<<solloc[i] << endl;
+    }
+  }
+
 
     //communication condition proc stencil
     for (int ini=0; ini <Nx*Ny; ini++)

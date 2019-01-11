@@ -37,12 +37,12 @@ Laplacian2D::Laplacian2D()
 
       }
 
-      vector<double> Laplacian2D::InitializeCI(double CI, int i1, int iN, int stencil)
+      vector<double> Laplacian2D::InitializeCI(double CI, int size_loc)
       {
         // // On initialise le vecteur solution ici.
-        vector <double> sol_ini(iN-i1+2*stencil);
+        vector <double> sol_ini(size_loc);
 
-        for (int i=0; i<iN-i1+2*stencil;i++)
+        for (int i=0; i<size_loc;i++)
         {
           sol_ini[i] = CI;
         }
@@ -57,20 +57,20 @@ Laplacian2D::Laplacian2D()
       }
 
 
-      vector<vector<double>> Laplacian2D::InitializeMatrix(int i1, int iN, const int stencil)
+      vector<vector<double>> Laplacian2D::InitializeMatrix(int i1, int iN, const int stencil, int size_loc)
       {
         // // On initialise la matrice pentadiagonale ici.
-        std::vector<std::vector<double>> LapMat(iN-i1+2*stencil, std::vector<double>(_Nx*_Ny,0.0));
-        for (int i=0; i<(iN-i1+2*stencil); i++)
-        {
-          LapMat[i].resize(_Nx*_Ny);
-        }
+        std::vector<std::vector<double>> LapMat(size_loc, std::vector<double>(_Nx*_Ny,0.0));
+        // for (int i=0; i<(iN-i1+2*stencil); i++)
+        // {
+        //   LapMat[i].resize(_Nx*_Ny);
+        // }
 
         double alpha = 1 + 2*_D*_deltaT/(_h_x*_h_x) + 2*_D*_deltaT/(_h_y*_h_y);
         double beta = -_D*_deltaT/(_h_x*_h_x);
         double gamma = -_D*_deltaT/(_h_y*_h_y);
 
-        for (int i=0; i<(iN-i1+2*stencil); i++)
+        for (int i=0; i<size_loc; i++)
         {
           if (_Me == 0) // i1 = 0 , iN = charge
           {
@@ -91,7 +91,7 @@ Laplacian2D::Laplacian2D()
             {
               LapMat[i][i+_Nx] = gamma;
             }
-            if (((i+1)%(_Nx) == 0)) // && (i!=0))
+            if (((i+1)%(_Nx) == 0))
             {
               LapMat[i][i+1] = 0.;
             }
@@ -167,29 +167,18 @@ Laplacian2D::Laplacian2D()
       std::vector<double> Laplacian2D::IterativeSolver(std::vector<std::vector<double>>LapMat, std::vector<double> solloc, int i1, int iN, const int stencil) // le nombre d'itération doit correspondre à la taille du stencil
       {
         // // Cette méthode est au coeur de la résolution du problème, elle permet d'effectuer la marche en temps
-        int Nloc = LapMat.size();
-
-        //Sauvegarde d'un points ou plusieurs points particuliers au cours du temps:------------------------------------------------------------------------------------
-        ofstream* flux_pts(new ofstream);
-
-
-        if(_save_points_file != "non")
-        {
-          //Si on sauvegarde des points en particulier, on initialise l'ouverture des fichiers ici.
-          flux_pts->open(_save_points_file+".txt", ios::out);
-        }
-
+        int size_loc = LapMat.size();
 
         //-------------------------------------------------------------------------------------------------------------------------------------------------------------
-
         for( int i=0 ; i<stencil ; i++)
         {
           //cout << i << " here"<< endl;
           // Laplacian2D::ConditionsLimites(i);
           //--------------------------------------------------------------------------
           //Prise en compte du terme source :
-          vector<double> floc(Nloc);
-          for (int k=0 ; k < Nloc ;k++)
+          vector<double> floc(size_loc);
+
+          for (int k=0 ; k < size_loc ;k++)
           {
             floc[k]=0.;
             int num = i1  + k;
@@ -217,13 +206,8 @@ Laplacian2D::Laplacian2D()
             }
           }
 
-
-          //------------------------------------------------------------------------
-          for (int k = 0; k < stencil; k++)
-          {
             solloc = ConditionsLimites(solloc, i1, iN);
-            solloc = CG(LapMat,floc,solloc,0.0001,20, Nloc, Nloc );
-          }
+            // solloc = CG(LapMat,floc,solloc,0.0001,20, size_loc, size_loc );
 
         }
 
